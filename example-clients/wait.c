@@ -128,11 +128,11 @@ main(int argc, char *argv[])
 		       }
 		}
 
-		// Wait a second, and repeat
+		// Wait 250ms, and repeat
 #ifdef WIN32
-		Sleep(1*1000);
+		Sleep(250);
 #else
-		sleep(1);
+		usleep(250*1000);
 #endif
 	}
 
