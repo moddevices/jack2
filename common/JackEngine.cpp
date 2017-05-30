@@ -613,7 +613,7 @@ int JackEngine::ClientExternalOpen(const char* name, int pid, int uuid, int* ref
 
     JackExternalClient* client = new JackExternalClient();
 
-    if (!fSynchroTable[refnum].Allocate(real_name, fEngineControl->fServerName, 0)) {
+    if (!fSynchroTable[refnum].Allocate(real_name, fEngineControl->fServerName, 0, false)) {
         jack_error("Cannot allocate synchro");
         goto error;
     }
@@ -663,7 +663,7 @@ int JackEngine::ClientInternalOpen(const char* name, int* ref, JackEngineControl
         goto error;
     }
 
-    if (!fSynchroTable[refnum].Allocate(name, fEngineControl->fServerName, 0)) {
+    if (!fSynchroTable[refnum].Allocate(name, fEngineControl->fServerName, 0, true)) {
         jack_error("Cannot allocate synchro");
         goto error;
     }
