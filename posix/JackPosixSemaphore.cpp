@@ -103,24 +103,24 @@ bool JackPosixSemaphore::Wait()
 
 bool JackPosixSemaphore::TimedWait(long usec)
 {
-	int res;
-	struct timeval now;
-	timespec time;
-
 	if (!fSemaphore) {
 		jack_error("JackPosixSemaphore::TimedWait name = %s already deallocated!!", fName);
 		return false;
 	}
-	gettimeofday(&now, 0);
-	time.tv_sec = now.tv_sec + usec / 1000000;
-    long tv_usec = (now.tv_usec + (usec % 1000000));
-    time.tv_sec += tv_usec / 1000000;
-    time.tv_nsec = (tv_usec % 1000000) * 1000;
 
-    while ((res = sem_timedwait(fSemaphore, &time)) < 0) {
+    int res;
+    timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
+
+    timespec delta = { usec / 1000000, (usec % 1000000) * 1000 };
+    timespec end   = { now.tv_sec + delta.tv_sec, now.tv_nsec + delta.tv_nsec };
+    if (end.tv_nsec >= 1000000000L) {
+        ++end.tv_sec;
+        end.tv_nsec -= 1000000000L;
+    }
+
+    while ((res = sem_timedwait(fSemaphore, &end)) < 0) {
         jack_error("JackPosixSemaphore::TimedWait err = %s", strerror(errno));
-        jack_log("JackPosixSemaphore::TimedWait now : %ld %ld ", now.tv_sec, now.tv_usec);
-        jack_log("JackPosixSemaphore::TimedWait next : %ld %ld ", time.tv_sec, time.tv_nsec/1000);
         if (errno != EINTR) {
             break;
         }
