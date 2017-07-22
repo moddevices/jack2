@@ -70,9 +70,6 @@ namespace Jack
 
 #define IsRealTime() ((fProcess != NULL) | (fThreadFun != NULL) | (fSync != NULL) | (fTimebase != NULL))
 
-JackClient::JackClient():fThread(this)
-{}
-
 JackClient::JackClient(JackSynchro* table):fThread(this)
 {
     fSynchroTable = table;
