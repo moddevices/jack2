@@ -49,11 +49,9 @@ JackTransportEngine::JackTransportEngine(): JackAtomicArrayState<jack_position_t
 }
 
 // compute the number of cycle for timeout
-void JackTransportEngine::SyncTimeout(jack_nframes_t frame_rate, jack_nframes_t buffer_size)
+void JackTransportEngine::SyncTimeout(jack_nframes_t, jack_nframes_t)
 {
-    long buf_usecs = (long)((buffer_size * (jack_time_t)1000000) / frame_rate);
-    fSyncTimeLeft = fSyncTimeout / buf_usecs;
-    jack_log("SyncTimeout fSyncTimeout = %ld fSyncTimeLeft = %ld", (long)fSyncTimeout, (long)fSyncTimeLeft);
+    fSyncTimeLeft = 1;
 }
 
 // Server
