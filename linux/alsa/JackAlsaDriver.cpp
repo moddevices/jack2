@@ -412,7 +412,7 @@ int JackAlsaDriver::Read()
 
 retry:
 
-    nframes = alsa_driver_wait((alsa_driver_t *)fDriver, -1, &wait_status, &fDelayedUsecs);
+    nframes = alsa_driver_wait((alsa_driver_t *)fDriver, -1, &wait_status);
 
     if (wait_status < 0)
         return -1;		/* driver failed */

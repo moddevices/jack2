@@ -247,7 +247,6 @@ void JackAudioDriver::ProcessGraphAsyncMaster()
 {
     // fBeginDateUst is set in the "low level" layer, fEndDateUst is from previous cycle
     if (!fEngine->Process(fBeginDateUst, fEndDateUst)) {
-        jack_error("JackAudioDriver::ProcessGraphAsyncMaster: Process error");
     }
 
     if (ResumeRefNum() < 0) {

@@ -28,6 +28,9 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #include <cstdio>
 #include <list>
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "types.h"
 #include "jack.h"
 #include "control.h"
@@ -545,6 +548,18 @@ int main(int argc, char** argv)
 
     if (jackctl_driver_params_parse(master_driver_ctl, master_driver_nargs, master_driver_args)) {
         goto destroy_server;
+    }
+
+    /*
+      Require the fastest response time possible regarding OS latency,
+      See https://access.redhat.com/articles/65410
+     */
+    {
+        const int32_t v = 0;
+        const int fd = open("/dev/cpu_dma_latency", O_WRONLY);
+
+        if (fd >= 0)
+            write(fd, &v, sizeof(v));
     }
 
     // Setup signals

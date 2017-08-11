@@ -29,7 +29,7 @@ JackMidiAsyncWaitQueue::JackMidiAsyncWaitQueue(size_t max_bytes,
                                                size_t max_messages):
     JackMidiAsyncQueue(max_bytes, max_messages)
 {
-    if (semaphore.Allocate("JackMidiAsyncWaitQueue", "midi-thread", 0)) {
+    if (semaphore.Allocate("JackMidiAsyncWaitQueue", "midi-thread", 0, true)) {
         throw std::bad_alloc();
     }
 }

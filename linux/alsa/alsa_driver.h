@@ -260,8 +260,7 @@ int
 alsa_driver_stop (alsa_driver_t *driver);
 
 jack_nframes_t
-alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
-		  *delayed_usecs);
+alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status);
 
 int
 alsa_driver_read (alsa_driver_t *driver, jack_nframes_t nframes);

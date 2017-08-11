@@ -218,12 +218,10 @@ void JackEngine::CheckXRun(jack_time_t callback_usecs)  // REVOIR les conditions
             jack_time_t finished_date = timing->fFinishedAt;
 
             if (status != NotTriggered && status != Finished) {
-                jack_error("JackEngine::XRun: client = %s was not finished, state = %s", client->GetClientControl()->fName, State2String(status));
                 fChannel.Notify(ALL_CLIENTS, kXRunCallback, 0);  // Notify all clients
             }
 
             if (status == Finished && (long)(finished_date - callback_usecs) > 0) {
-                jack_error("JackEngine::XRun: client %s finished after current callback", client->GetClientControl()->fName);
                 fChannel.Notify(ALL_CLIENTS, kXRunCallback, 0);  // Notify all clients
             }
         }
@@ -615,7 +613,7 @@ int JackEngine::ClientExternalOpen(const char* name, int pid, int uuid, int* ref
 
     JackExternalClient* client = new JackExternalClient();
 
-    if (!fSynchroTable[refnum].Allocate(real_name, fEngineControl->fServerName, 0)) {
+    if (!fSynchroTable[refnum].Allocate(real_name, fEngineControl->fServerName, 0, false)) {
         jack_error("Cannot allocate synchro");
         goto error;
     }
@@ -665,7 +663,7 @@ int JackEngine::ClientInternalOpen(const char* name, int* ref, JackEngineControl
         goto error;
     }
 
-    if (!fSynchroTable[refnum].Allocate(name, fEngineControl->fServerName, 0)) {
+    if (!fSynchroTable[refnum].Allocate(name, fEngineControl->fServerName, 0, true)) {
         jack_error("Cannot allocate synchro");
         goto error;
     }
