@@ -69,6 +69,9 @@ namespace Jack
 
 int JackAlsaDriver::SetBufferSize(jack_nframes_t buffer_size)
 {
+    if (buffer_size == 0)
+        buffer_size = fEngineControl->fBufferSize;
+
     jack_log("JackAlsaDriver::SetBufferSize %ld", buffer_size);
     int res = alsa_driver_reset_parameters((alsa_driver_t *)fDriver, buffer_size,
                                            ((alsa_driver_t *)fDriver)->user_nperiods,
@@ -924,6 +927,7 @@ int Restart()
 {
     int res;
     if ((res = g_alsa_driver->Stop()) == 0) {
+        g_alsa_driver->SetBufferSize(0);
         res = g_alsa_driver->Start();
     }
     return res;
