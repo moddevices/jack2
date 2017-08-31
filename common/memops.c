@@ -508,6 +508,8 @@ void sample_move_dS_s32u24 (jack_default_audio_sample_t *dst, char *src, unsigne
 	nsamples = nsamples & 3;
 #elif defined(__ARM_NEON__)
 	unsigned long unrolled = nsamples / 4;
+	unsigned long orig_src_skip = src_skip;
+	if (nsamples != 128) src_skip = 0;
 	float32x4_t factor = vdupq_n_f32(1.0 / SAMPLE_24BIT_SCALING);
 	while (unrolled--) {
 		int32x4_t src128;
@@ -519,10 +521,10 @@ void sample_move_dS_s32u24 (jack_default_audio_sample_t *dst, char *src, unsigne
 				src128 = vld2q_s32((int32_t*)src).val[0];
 				break;
 			default:
-				src128 = vld1q_lane_s32((int32_t*)src,              src128, 0);
-				src128 = vld1q_lane_s32((int32_t*)(src+src_skip),   src128, 1);
-				src128 = vld1q_lane_s32((int32_t*)(src+2*src_skip), src128, 2);
-				src128 = vld1q_lane_s32((int32_t*)(src+3*src_skip), src128, 3);
+				src128 = vld1q_lane_s32((int32_t*)src,                   src128, 0);
+				src128 = vld1q_lane_s32((int32_t*)(src+orig_src_skip),   src128, 1);
+				src128 = vld1q_lane_s32((int32_t*)(src+2*orig_src_skip), src128, 2);
+				src128 = vld1q_lane_s32((int32_t*)(src+3*orig_src_skip), src128, 3);
 				break;
 		}
 		int32x4_t shifted = vshrq_n_s32(src128, 8);
@@ -530,10 +532,11 @@ void sample_move_dS_s32u24 (jack_default_audio_sample_t *dst, char *src, unsigne
 		float32x4_t divided = vmulq_f32(as_float, factor);
 		vst1q_f32(dst, divided);
 
-		src += 4*src_skip;
+		src += 4*orig_src_skip;
 		dst += 4;
 	}
 	nsamples = nsamples & 3;
+	src_skip = orig_src_skip;
 #endif
 
 	/* ALERT: signed sign-extension portability !!! */
