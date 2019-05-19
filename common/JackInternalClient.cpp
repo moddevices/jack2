@@ -155,9 +155,6 @@ int JackLoadableInternalClient::Init(const char* so_name)
     }
 
     fDescriptor = (JackDriverDescFunction)GetJackProc(fHandle, "jack_get_descriptor");
-    if (fDescriptor == NULL) {
-        jack_info("No jack_get_descriptor entry-point for %s", so_name);
-    }
     return 0;
 }
 
