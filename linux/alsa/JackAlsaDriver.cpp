@@ -927,7 +927,9 @@ int Restart()
 {
     int res;
     if ((res = g_alsa_driver->Stop()) == 0) {
+#if defined(__ARM_ARCH_7A__)
         g_alsa_driver->SetBufferSize(0);
+#endif
         res = g_alsa_driver->Start();
     }
     return res;
