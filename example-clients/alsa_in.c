@@ -532,7 +532,7 @@ latency_cb (jack_latency_callback_mode_t mode, void *arg)
 
 void alloc_ports( int n_capture, int n_playback ) {
 
-    int port_flags = JackPortIsOutput;
+    int port_flags = JackPortIsOutput|JackPortIsPhysical;
     int chn;
     jack_port_t *port;
     char buf[32];
@@ -540,7 +540,7 @@ void alloc_ports( int n_capture, int n_playback ) {
     capture_ports = NULL;
     for (chn = 0; chn < n_capture; chn++)
     {
-	snprintf (buf, sizeof(buf) - 1, "capture_%u", chn+1);
+	snprintf (buf, sizeof(buf) - 1, "USB_Audio_Capture_%u", chn+1);
 
 	port = jack_port_register (client, buf,
 		JACK_DEFAULT_AUDIO_TYPE,
