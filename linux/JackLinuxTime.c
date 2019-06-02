@@ -143,7 +143,7 @@ static jack_time_t jack_get_microseconds_from_system (void)
 	jack_time_t jackTime;
 	struct timespec time;
 
-#if defined(__ARM_ARCH_7A__)
+#ifdef CLOCK_MONOTONIC_RAW
 	clock_gettime(CLOCK_MONOTONIC_RAW, &time);
 #else
 	clock_gettime(CLOCK_MONOTONIC, &time);
