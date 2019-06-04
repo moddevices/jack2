@@ -558,12 +558,19 @@ int main(int argc, char** argv)
       Require the fastest response time possible regarding OS latency,
       See https://access.redhat.com/articles/65410
      */
+    if (getenv("JACK_NO_CPU_DMA_LATENCY_OPTIMIZATION") == NULL)
     {
         const int32_t v = 0;
         const int fd = open("/dev/cpu_dma_latency", O_WRONLY);
 
         if (fd >= 0)
             write(fd, &v, sizeof(v));
+
+        printf("CPU DMA Latency optimization enabled\n");
+    }
+    else
+    {
+        printf("CPU DMA Latency optimization disabled\n");
     }
 
     // Setup signals
