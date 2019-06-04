@@ -37,6 +37,12 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 namespace Jack
 {
 
+static bool areFutexesOptimizedForInternalClients()
+{
+    static bool ret = (getenv("JACK_NO_OPTIMIZATIONS") == NULL);
+    return ret;
+}
+
 JackEngine::JackEngine(JackGraphManager* manager,
                        JackSynchro* table,
                        JackEngineControl* control,
@@ -663,7 +669,7 @@ int JackEngine::ClientInternalOpen(const char* name, int* ref, JackEngineControl
         goto error;
     }
 
-    if (!fSynchroTable[refnum].Allocate(name, fEngineControl->fServerName, 0, true)) {
+    if (!fSynchroTable[refnum].Allocate(name, fEngineControl->fServerName, 0, areFutexesOptimizedForInternalClients())) {
         jack_error("Cannot allocate synchro");
         goto error;
     }
