@@ -1061,9 +1061,13 @@ struct JackInternalClientLoadRequest : public JackRequest
         memset(fName, 0, sizeof(fName));
         memset(fDllName, 0, sizeof(fDllName));
         memset(fLoadInitName, 0, sizeof(fLoadInitName));
-        snprintf(fName, sizeof(fName), "%s", client_name);
-        snprintf(fDllName, sizeof(fDllName), "%s", so_name);
-        snprintf(fLoadInitName, sizeof(fLoadInitName), "%s", objet_data);
+        strncpy(fName, client_name, sizeof(fName)-1);
+        if (so_name) {
+            strncpy(fDllName, so_name, sizeof(fDllName)-1);
+        }
+        if (objet_data) {
+            strncpy(fLoadInitName, objet_data, sizeof(fLoadInitName)-1);
+        }
     }
 
     int Read(detail::JackChannelTransactionInterface* trans)
