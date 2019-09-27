@@ -469,6 +469,7 @@ again:
     {
 	jack_port_t *port = (jack_port_t *) node->data;
 	float *buf = jack_port_get_buffer (port, nframes);
+	memset(buf, 0, sizeof(float)*nframes);
 
 	SRC_STATE *src_state = src_node->data;
 
