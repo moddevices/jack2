@@ -62,6 +62,10 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #include <celt/celt.h>
 #endif
 
+#ifndef CUSTOM_MODES
+#define CUSTOM_MODES // for opus_custom_decoder_init
+#endif
+
 #if HAVE_OPUS
 #include <opus/opus.h>
 #include <opus/opus_custom.h>
@@ -244,7 +248,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
 /**
  * The Sync callback... sync state is set elsewhere...
  * we will see if this is working correctly.
- * i dont really believe in it yet.
+ * i don't really believe in it yet.
  */
 int
 sync_cb (jack_transport_state_t state, jack_position_t *pos, void *arg)
@@ -423,7 +427,7 @@ process (jack_nframes_t nframes, void *arg)
     }
     /* Second alternative : we've received something that's not
      * as big as expected or we missed a packet. We render silence
-     * to the ouput ports */
+     * to the output ports */
     else {
         jack_nframes_t latency_estimate;
         if( packet_cache_find_latency( packcache, framecnt, &latency_estimate ) )
@@ -696,7 +700,7 @@ main (int argc, char *argv[])
     insockfd = socket (AF_INET, SOCK_DGRAM, 0);
 
     if ((outsockfd == -1) || (insockfd == -1)) {
-        fprintf (stderr, "cant open sockets\n" );
+        fprintf (stderr, "can not open sockets\n" );
         return 1;
     }
 

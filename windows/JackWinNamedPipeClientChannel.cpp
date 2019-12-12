@@ -38,7 +38,7 @@ JackWinNamedPipeClientChannel::~JackWinNamedPipeClientChannel()
     delete fRequest;
 }
 
-int JackWinNamedPipeClientChannel::Open(const char* server_name, const char* name, int uuid, char* name_res, JackClient* client, jack_options_t options, jack_status_t* status)
+int JackWinNamedPipeClientChannel::Open(const char* server_name, const char* name, jack_uuid_t uuid, char* name_res, JackClient* client, jack_options_t options, jack_status_t* status)
 {
     int result = 0;
     jack_log("JackWinNamedPipeClientChannel::Open name = %s", name);
@@ -152,7 +152,7 @@ bool JackWinNamedPipeClientChannel::Execute()
     return true;
 
 error:
-    // Close the pipes, server wont be able to create them otherwise.
+    // Close the pipes, server won't be able to create them otherwise.
     fNotificationListenPipe.Close();
     fRequest->Close();
     fClient->ShutDown(jack_status_t(JackFailure | JackServerError), JACK_SERVER_FAILURE);

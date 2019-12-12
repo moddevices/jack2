@@ -219,6 +219,7 @@ jackctl_free_driver_parameters(
     while (driver_ptr->parameters)
     {
         next_node_ptr = driver_ptr->parameters->next;
+        jack_constraint_free(((jackctl_parameter *)driver_ptr->parameters->data)->constraint_ptr);
         free(driver_ptr->parameters->data);
         free(driver_ptr->parameters);
         driver_ptr->parameters = next_node_ptr;
@@ -526,6 +527,7 @@ jackctl_server_free_parameters(
     while (server_ptr->parameters)
     {
         next_node_ptr = server_ptr->parameters->next;
+        jack_constraint_free(((jackctl_parameter *)server_ptr->parameters->data)->constraint_ptr);
         free(server_ptr->parameters->data);
         free(server_ptr->parameters);
         server_ptr->parameters = next_node_ptr;
@@ -745,6 +747,14 @@ SERVER_EXPORT jackctl_server_t * jackctl_server_create(
     bool (* on_device_acquire)(const char * device_name),
     void (* on_device_release)(const char * device_name))
 {
+    return jackctl_server_create2(on_device_acquire, on_device_release, NULL);
+}
+
+SERVER_EXPORT jackctl_server_t * jackctl_server_create2(
+    bool (* on_device_acquire)(const char * device_name),
+    void (* on_device_release)(const char * device_name),
+    void (* on_device_reservation_loop)(void))
+{
     struct jackctl_server * server_ptr;
     union jackctl_parameter_value value;
 
@@ -920,6 +930,7 @@ SERVER_EXPORT jackctl_server_t * jackctl_server_create(
 
     JackServerGlobals::on_device_acquire = on_device_acquire;
     JackServerGlobals::on_device_release = on_device_release;
+    JackServerGlobals::on_device_reservation_loop = on_device_reservation_loop;
 
     if (!jackctl_drivers_load(server_ptr))
     {
@@ -1070,7 +1081,7 @@ jackctl_server_open(
 
         return true;
 
-    } catch (std::exception e) {
+    } catch (std::exception&) {
         jack_error("jackctl_server_open error...");
         jackctl_destroy_param_list(paramlist);
     }
@@ -1433,5 +1444,3 @@ SERVER_EXPORT bool jackctl_server_switch_master(jackctl_server * server_ptr, jac
         return false;
     }
 }
-
-

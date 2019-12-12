@@ -194,21 +194,21 @@ bool JackServer::IsRunning()
 // Internal clients 
 //------------------
 
-int JackServer::InternalClientLoad1(const char* client_name, const char* so_name, const char* objet_data, int options, int* int_ref, int uuid, int* status)
+int JackServer::InternalClientLoad1(const char* client_name, const char* so_name, const char* objet_data, int options, int* int_ref, jack_uuid_t uuid, int* status)
 {
     JackLoadableInternalClient* client = new JackLoadableInternalClient1(JackServerGlobals::fInstance, GetSynchroTable(), objet_data);
     assert(client);
     return InternalClientLoadAux(client, so_name, client_name, options, int_ref, uuid, status);
  }
 
-int JackServer::InternalClientLoad2(const char* client_name, const char* so_name, const JSList * parameters, int options, int* int_ref, int uuid, int* status)
+int JackServer::InternalClientLoad2(const char* client_name, const char* so_name, const JSList * parameters, int options, int* int_ref, jack_uuid_t uuid, int* status)
 {
     JackLoadableInternalClient* client = new JackLoadableInternalClient2(JackServerGlobals::fInstance, GetSynchroTable(), parameters);
     assert(client);
     return InternalClientLoadAux(client, so_name, client_name, options, int_ref, uuid, status);
 }
 
-int JackServer::InternalClientLoadAux(JackLoadableInternalClient* client, const char* so_name, const char* client_name, int options, int* int_ref, int uuid, int* status)
+int JackServer::InternalClientLoadAux(JackLoadableInternalClient* client, const char* so_name, const char* client_name, int options, int* int_ref, jack_uuid_t uuid, int* status)
 {
     // Clear status
     *status = 0;
@@ -271,7 +271,7 @@ int JackServer::SetBufferSize(jack_nframes_t buffer_size)
 Freewheel mode is implemented by switching from the (audio [slaves] + freewheel) driver to the freewheel driver only:
 
     - "global" connection state is saved
-    - all audio driver and slaves ports are deconnected, thus there is no more dependancies with the audio driver and slaves
+    - all audio driver and slaves ports are deconnected, thus there is no more dependencies with the audio driver and slaves
     - the freewheel driver will be synchronized with the end of graph execution : all clients are connected to the freewheel driver
     - the freewheel driver becomes the "master"
 

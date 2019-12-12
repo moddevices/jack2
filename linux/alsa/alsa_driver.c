@@ -57,6 +57,8 @@ char* strcasestr(const char* haystack, const char* needle);
 
 /* Delay (in process calls) before jackd will report an xrun */
 #define XRUN_REPORT_DELAY 0
+/* Max re-try count for Alsa poll timeout handling */
+#define MAX_RETRY_COUNT 5
 
 void
 jack_driver_init (jack_driver_t *driver)
@@ -590,6 +592,20 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		return -1;
 	}
 
+	err = snd_pcm_sw_params_set_tstamp_mode(handle, sw_params, SND_PCM_TSTAMP_ENABLE);
+	if (err < 0) {
+		jack_info("Could not enable ALSA time stamp mode for %s (err %d)",
+			  stream_name, err);
+	}
+
+#if SND_LIB_MAJOR >= 1 && SND_LIB_MINOR >= 1
+	err = snd_pcm_sw_params_set_tstamp_type(handle, sw_params, SND_PCM_TSTAMP_TYPE_MONOTONIC);
+	if (err < 0) {
+		jack_info("Could not use monotonic ALSA time stamps for %s (err %d)",
+			  stream_name, err);
+	}
+#endif
+
 	if ((err = snd_pcm_sw_params (handle, sw_params)) < 0) {
 		jack_error ("ALSA: cannot set software parameters for %s\n",
 			    stream_name);
@@ -653,7 +669,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 		}
 	}
 
-	/* check the rate, since thats rather important */
+	/* check the rate, since that's rather important */
 
 	if (driver->playback_handle) {
 		snd_pcm_hw_params_get_rate (driver->playback_hw_params,
@@ -698,7 +714,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	}
 
 
-	/* check the fragment size, since thats non-negotiable */
+	/* check the fragment size, since that's non-negotiable */
 
 	if (driver->playback_handle) {
  		snd_pcm_access_t access;
@@ -899,6 +915,9 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 */
 
 	return 0;
+
+	// may be unused
+	(void)err;
 }
 
 int
@@ -1213,7 +1232,8 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver)
 			    < 0) {
 				jack_error("error preparing after suspend: %s", snd_strerror(res));
 			}
-		} else {
+		} 
+		if (driver->playback_handle) {
 			if ((res = snd_pcm_prepare(driver->playback_handle))
 			    < 0) {
 				jack_error("error preparing after suspend: %s", snd_strerror(res));
@@ -1224,6 +1244,17 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver)
 	if (snd_pcm_status_get_state(status) == SND_PCM_STATE_XRUN
 	    && driver->process_count > XRUN_REPORT_DELAY) {
 		driver->xrun_count++;
+
+		if (driver->capture_handle) {
+			if ((res = snd_pcm_prepare(driver->capture_handle)) < 0) {
+				jack_error("error preparing after xrun: %s", snd_strerror(res));
+			}
+		}
+		if (driver->playback_handle) {
+			if ((res = snd_pcm_prepare(driver->playback_handle)) < 0) {
+				jack_error("error preparing after xrun: %s", snd_strerror(res));
+			}
+		}
 	}
 
 	if (alsa_driver_restart (driver)) {
@@ -1270,6 +1301,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status)
 	int xrun_detected = FALSE;
 	int need_capture;
 	int need_playback;
+	int retry_cnt = 0;
 	unsigned int i;
 	jack_time_t poll_enter;
 	jack_time_t poll_ret = 0;
@@ -1286,7 +1318,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status)
 
   again:
 
-	while (need_playback || need_capture) {
+	while ((need_playback || need_capture) && !xrun_detected) {
 
 		int poll_result;
 		unsigned int ci = 0;
@@ -1362,6 +1394,25 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status)
 
 		poll_ret = jack_get_microseconds ();
 
+		if (poll_result == 0) {
+			retry_cnt++;
+			if(retry_cnt > MAX_RETRY_COUNT) {
+				jack_error ("ALSA: poll time out, polled for %" PRIu64
+					    " usecs, Reached max retry cnt = %d, Exiting",
+					    poll_ret - poll_enter, MAX_RETRY_COUNT);
+				*status = -5;
+				return 0;
+			}
+			jack_log ("ALSA: poll time out, polled for %" PRIu64
+				  " usecs, Retrying with a recovery, retry cnt = %d",
+				  poll_ret - poll_enter, retry_cnt);
+			*status = alsa_driver_xrun_recovery (driver, delayed_usecs);
+			if(*status != 0) {
+				jack_error ("ALSA: poll time out, recovery failed with status = %d", *status);
+				return 0;
+			}
+		}
+
         // JACK2
         SetTime(poll_ret);
 
@@ -1407,6 +1458,12 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status)
 				return 0;
 			}
 
+			if (revents & POLLNVAL) {
+				jack_error ("ALSA: playback device disconnected");
+				*status = -7;
+				return 0;
+			}
+
 			if (revents & POLLERR) {
 				xrun_detected = TRUE;
 			}
@@ -1430,6 +1487,12 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status)
 				return 0;
 			}
 
+			if (revents & POLLNVAL) {
+				jack_error ("ALSA: capture device disconnected");
+				*status = -7;
+				return 0;
+			}
+
 			if (revents & POLLERR) {
 				xrun_detected = TRUE;
 			}
@@ -1443,15 +1506,6 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status)
 #endif
 			}
 		}
-
-		if (poll_result == 0) {
-			jack_error ("ALSA: poll time out, polled for %" PRIu64
-				    " usecs",
-				    poll_ret - poll_enter);
-			*status = -5;
-			return 0;
-		}
-
 	}
 
 	if (driver->capture_handle) {
@@ -1851,7 +1905,7 @@ discover_alsa_using_apps ()
         while (dir) {
                 char maybe[PATH_MAX+1];
                 snprintf (maybe, sizeof(maybe), "%s/lsof", dir);
-                if (access (maybe, X_OK)) {
+                if (access (maybe, X_OK) == 0) {
                         break;
                 }
                 dir = strtok (NULL, ":");

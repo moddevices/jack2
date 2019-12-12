@@ -71,7 +71,7 @@ int JackInternalSessionLoader::Load(const char* file)
              * Therefore only compare the first letter of the command.
              */
         } else {
-            jack_error("JACK internal session file %s line %u contains unkown command '%s'. Ignoring the line!", file, linenr, line.c_str());
+            jack_error("JACK internal session file %s line %u contains unknown command '%s'. Ignoring the line!", file, linenr, line.c_str());
         }
     }
 
@@ -132,7 +132,7 @@ void JackInternalSessionLoader::LoadClient(std::istringstream& iss, const int li
 
     /* status has not to be checked for JackFailure
      * because JackServer::InternalClientLoad1() will return a value < 0
-     * and this is handled by the previouse if-clause.
+     * and this is handled by the previous if-clause.
      */
 
     jack_info("Internal client %s successfully loaded", client_name.c_str());

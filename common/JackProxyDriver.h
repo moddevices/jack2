@@ -50,11 +50,11 @@ namespace Jack
     The main use case is the multi-user, multi-session, shared workstation:
 
     - a classic server with hw driver is launched system-wide at boot time, in
-      promiscuous mode, optionaly restricted to the audio group
+      promiscuous mode, optionally restricted to the audio group
     - in each user session, a jackdbus server is automatically started with
       JackProxyDriver as master driver, automatically connected to the
       system-wide one
-    - optionaly, each user run PulseAudio with a pulse-jack bridge
+    - optionally, each user run PulseAudio with a pulse-jack bridge
     */
 
     class JackProxyDriver : public JackRestarterDriver
@@ -73,10 +73,10 @@ namespace Jack
             int* fUpstreamCapturePortConnected;      /*<! map of capture ports connected upstream, for optimization purpose */
             int* fUpstreamPlaybackPortConnected;     /*<! map of playback ports connected upstream, for optimization purpose */
 
-            bool fAutoSave;                          /*<! wether the local connections should be saved/restored when upstream connection is restarted */
-            bool fAutoConnect;                       /*<! wether the upstream ports should be automatically connected to upstream physical ports */
-            bool fDetectPlaybackChannels;            /*<! wether the number of playback ports registered should match the number of upstream physical playback ports */
-            bool fDetectCaptureChannels;             /*<! wether the number of capture ports registered should match the number of upstream physical capture ports */
+            bool fAutoSave;                          /*<! whether the local connections should be saved/restored when upstream connection is restarted */
+            bool fAutoConnect;                       /*<! whether the upstream ports should be automatically connected to upstream physical ports */
+            bool fDetectPlaybackChannels;            /*<! whether the number of playback ports registered should match the number of upstream physical playback ports */
+            bool fDetectCaptureChannels;             /*<! whether the number of capture ports registered should match the number of upstream physical capture ports */
 
             bool Initialize();                       /*<! establish upstream connection and register the client callbacks */
 

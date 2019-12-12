@@ -1,6 +1,7 @@
 /*
  *  session_notify.c -- ultra minimal session manager
  *
+ *  Copyright (C) 2018 Karl Linden <karl.j.linden@gmail.com>
  *  Copyright (C) 2010 Torben Hohn.
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -18,6 +19,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <alloca.h>
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -86,7 +88,7 @@ JSList *uuid_map = NULL;
 void add_uuid_mapping( const char *uuid ) {
 	char *clientname = jack_get_client_name_by_uuid( client, uuid );
 	if( !clientname ) {
-		printf( "error... cant find client for uuid" );
+		printf( "error... can not find client for uuid" );
 		return;
 	}
 

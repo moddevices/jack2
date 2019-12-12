@@ -106,7 +106,7 @@ alsa_format_t formats[] = {
 #define NUMFORMATS (sizeof(formats)/sizeof(formats[0]))
 int format=0;
 
-// Alsa stuff... i dont want to touch this bullshit in the next years.... please...
+// Alsa stuff... i don't want to touch this bullshit in the next years.... please...
 
 static int xrun_recovery(snd_pcm_t *handle, int err) {
 //    printf( "xrun !!!.... %d\n", err );
@@ -185,7 +185,7 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
 		return err;
 	}
 	if (rchannels != channels) {
-		printf("WARNING: chennel count does not match (requested %d got %d)\n", channels, rchannels);
+		printf("WARNING: channel count does not match (requested %d got %d)\n", channels, rchannels);
 		num_channels = rchannels;
 	}
 	/* set the stream rate */
@@ -411,7 +411,7 @@ int process (jack_nframes_t nframes, void *arg) {
 
     // Clamp offset.
     // the smooth offset still contains unwanted noise
-    // which would go straigth onto the resample coeff.
+    // which would go straight onto the resample coeff.
     // it only used in the P component and the I component is used for the fine tuning anyways.
     if( fabs( smooth_offset ) < pclamp )
 	    smooth_offset = 0.0;
@@ -421,7 +421,7 @@ int process (jack_nframes_t nframes, void *arg) {
     // K = 1/catch_factor and T = catch_factor2
     double current_resample_factor = static_resample_factor - smooth_offset / (double) catch_factor - offset_integral / (double) catch_factor / (double)catch_factor2;
 
-    // now quantize this value around resample_mean, so that the noise which is in the integral component doesnt hurt.
+    // now quantize this value around resample_mean, so that the noise which is in the integral component doesn't hurt.
     current_resample_factor = floor( (current_resample_factor - resample_mean) * controlquant + 0.5 ) / controlquant + resample_mean;
 
     // Output "instrumentatio" gonna change that to real instrumentation in a few.
@@ -600,6 +600,7 @@ void printUsage() {
 fprintf(stderr, "usage: alsa_out [options]\n"
 		"\n"
 		"  -j <jack name> - client name\n"
+		"  -S <server name> - server to connect\n"
 		"  -d <alsa_device> \n"
 		"  -c <channels> \n"
 		"  -p <period_size> \n"
@@ -628,13 +629,15 @@ sigterm_handler( int signal )
 int main (int argc, char *argv[]) {
     char jack_name[30] = "alsa_in";
     char alsa_device[30] = "hw:0";
+    char *server_name = NULL;
+    int jack_opts = 0;
 
     extern char *optarg;
     extern int optind, optopt;
     int errflg=0;
     int c;
 
-    while ((c = getopt(argc, argv, "ivj:r:c:p:n:d:q:m:t:f:F:C:Q:s:")) != -1) {
+    while ((c = getopt(argc, argv, "ivj:r:c:p:n:d:q:m:t:f:F:C:Q:s:S:")) != -1) {
 	switch(c) {
 	    case 'j':
 		strcpy(jack_name,optarg);
@@ -684,6 +687,10 @@ int main (int argc, char *argv[]) {
 	    case 's':
 		smooth_size = atoi(optarg);
 		break;
+	    case 'S':
+		server_name = optarg;
+		jack_opts |= JackServerName;
+		break;
 	    case ':':
 		fprintf(stderr,
 			"Option -%c requires an operand\n", optopt);
@@ -704,7 +711,7 @@ int main (int argc, char *argv[]) {
 	fprintf (stderr, "invalid samplerate quality\n");
 	return 1;
     }
-    if ((client = jack_client_open (jack_name, 0, NULL)) == 0) {
+    if ((client = jack_client_open (jack_name, jack_opts, NULL, server_name)) == 0) {
 	fprintf (stderr, "jack server not running?\n");
 	return 1;
     }
@@ -775,11 +782,11 @@ int main (int argc, char *argv[]) {
 	max_diff = num_periods*period_size - target_delay ;	
 
     if( max_diff > target_delay ) {
-	    fprintf( stderr, "target_delay (%d) cant be smaller than max_diff(%d)\n", target_delay, max_diff );
+	    fprintf( stderr, "target_delay (%d) can not be smaller than max_diff(%d)\n", target_delay, max_diff );
 	    exit(20);
     }
     if( (target_delay+max_diff) > (num_periods*period_size) ) {
-	    fprintf( stderr, "target_delay+max_diff (%d) cant be bigger than buffersize(%d)\n", target_delay+max_diff, num_periods*period_size );
+	    fprintf( stderr, "target_delay+max_diff (%d) can not be bigger than buffersize(%d)\n", target_delay+max_diff, num_periods*period_size );
 	    exit(20);
     }
     // alloc input ports, which are blasted out to alsa...
@@ -838,4 +845,3 @@ int main (int argc, char *argv[]) {
     jack_client_close (client);
     exit (0);
 }
-

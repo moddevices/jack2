@@ -55,12 +55,12 @@ class SERVER_EXPORT JackEngine : public JackLockAble
         JackServerNotifyChannel fChannel;              /*! To communicate between the RT thread and server */
         JackProcessSync fSignal;
         jack_time_t fLastSwitchUsecs;
+        JackMetadata fMetadata;
 
         int fSessionPendingReplies;
         detail::JackChannelTransactionInterface* fSessionTransaction;
         JackSessionNotifyResult* fSessionResult;
         std::map<int,std::string> fReservationMap;
-        int fMaxUUID;
 
         int ClientCloseAux(int refnum, bool wait);
         void CheckXRun(jack_time_t callback_usecs);
@@ -78,7 +78,7 @@ class SERVER_EXPORT JackEngine : public JackLockAble
         void ReleaseRefnum(int refnum);
 
         int ClientNotify(JackClientInterface* client, int refnum, const char* name, int notify, int sync, const char* message, int value1, int value2);
-        
+
         void NotifyClient(int refnum, int event, int sync, const char*  message, int value1, int value2);
         void NotifyClients(int event, int sync, const char*  message,  int value1, int value2);
 
@@ -87,8 +87,7 @@ class SERVER_EXPORT JackEngine : public JackLockAble
         void NotifyPortRename(jack_port_id_t src, const char* old_name);
         void NotifyActivate(int refnum);
 
-        int GetNewUUID();
-        void EnsureUUID(int uuid);
+        void EnsureUUID(jack_uuid_t uuid);
 
         bool CheckClient(int refnum)
         {
@@ -104,11 +103,11 @@ class SERVER_EXPORT JackEngine : public JackLockAble
 
         int Open();
         int Close();
-      
+
         // Client management
-        int ClientCheck(const char* name, int uuid, char* name_res, int protocol, int options, int* status);
-        
-        int ClientExternalOpen(const char* name, int pid, int uuid, int* ref, int* shared_engine, int* shared_client, int* shared_graph_manager);
+        int ClientCheck(const char* name, jack_uuid_t uuid, char* name_res, int protocol, int options, int* status);
+
+        int ClientExternalOpen(const char* name, int pid, jack_uuid_t uuid, int* ref, int* shared_engine, int* shared_client, int* shared_graph_manager);
         int ClientInternalOpen(const char* name, int* ref, JackEngineControl** shared_engine, JackGraphManager** shared_manager, JackClientInterface* client, bool wait);
 
         int ClientExternalClose(int refnum);
@@ -116,7 +115,7 @@ class SERVER_EXPORT JackEngine : public JackLockAble
 
         int ClientActivate(int refnum, bool is_real_time);
         int ClientDeactivate(int refnum);
-        
+
         void ClientKill(int refnum);
 
         int GetClientPID(const char* name);
@@ -139,7 +138,11 @@ class SERVER_EXPORT JackEngine : public JackLockAble
 
         int PortRename(int refnum, jack_port_id_t port, const char* name);
 
+        int PortSetDefaultMetadata(jack_port_id_t port, const char* pretty_name);
+
         int ComputeTotalLatencies();
+
+        int PropertyChangeNotify(jack_uuid_t subject, const char* key,jack_property_change_t change);
 
         // Graph
         bool Process(jack_time_t cur_cycle_begin, jack_time_t prev_cycle_end);

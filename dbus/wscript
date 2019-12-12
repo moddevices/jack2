@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/python3
 # encoding: utf-8
 
 import os.path
@@ -12,7 +12,7 @@ def options(opt):
 def configure(conf):
     conf.env['BUILD_JACKDBUS'] = False
 
-    if not conf.check_cfg(package='dbus-1', atleast_version='1.0.0', args='--cflags --libs', mandatory=False):
+    if not conf.check_cfg(package='dbus-1 >= 1.0.0', args='--cflags --libs', mandatory=False):
         print(Logs.colors.RED + 'ERROR !! jackdbus will not be built because libdbus-dev is missing' + Logs.colors.NORMAL)
         return
 
@@ -63,8 +63,14 @@ def build(bld):
         ]
     obj.use = ['serverlib']
     if bld.env['IS_LINUX']:
+        obj.source += [
+            '../linux/uptime.c',
+        ]
         obj.use += ['PTHREAD', 'DL', 'RT', 'DBUS-1', 'EXPAT', 'STDC++']
     if bld.env['IS_MACOSX']:
+        obj.source += [
+            '../macosx/uptime.c',
+        ]
         obj.use += ['PTHREAD', 'DL', 'DBUS-1', 'EXPAT']
     obj.target = 'jackdbus'
 

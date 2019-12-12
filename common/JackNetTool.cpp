@@ -884,7 +884,7 @@ namespace Jack
         for (int port_index = 0; port_index < fNPorts; port_index++) {
             if (fPortBuffer[port_index]) {
                 int res = opus_custom_decode_float(fOpusDecoder[port_index], fCompressedBuffer[port_index], fCompressedSizesByte[port_index], fPortBuffer[port_index], ((nframes == -1) ? fPeriodSize : nframes));
-                if (res < 0 || res != ((nframes == -1) ? fPeriodSize : nframes)) {
+                if (res < 0 || res != ((nframes == -1) ? (int)fPeriodSize : nframes)) {
                     jack_error("opus_custom_decode_float error fCompressedSizeByte = %d res = %d", fCompressedSizesByte[port_index], res);
                 }
             }
@@ -1356,7 +1356,7 @@ namespace Jack
         }
 
         if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2) {
-            jack_error("Could not find a useable version of Winsock.dll\n");
+            jack_error("Could not find a usable version of Winsock.dll\n");
             WSACleanup();
             return -1;
         }

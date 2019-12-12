@@ -52,6 +52,7 @@
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <stdlib.h>
+#include "promiscuous.h"
 
 #endif
 
@@ -64,7 +65,7 @@ static int GetUID()
     return  _getpid();
     //#error "No getuid function available"
 #else
-    return getuid();
+    return geteuid();
 #endif
 }
 
@@ -654,7 +655,7 @@ jack_cleanup_shm ()
  * from here.
  *
  * This is not done under a single lock.  I don't even want to think
- * about all the things that could possibly go wrong if multple
+ * about all the things that could possibly go wrong if multiple
  * processes tried to resize the same segment concurrently.  That
  * probably doesn't happen.
  */
@@ -767,7 +768,7 @@ jack_create_registry (jack_shm_info_t *ri)
 		return rc;
 	}
 
-    /* Previous shm_open result depends of the actual value of umask, force correct file permisssion here */
+    /* Previous shm_open result depends of the actual value of umask, force correct file permission here */
     if (fchmod(shm_fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH) < 0) {
 	    jack_log("Cannot chmod jack-shm-registry (%s) %d %d", strerror (errno));
     }
@@ -837,6 +838,7 @@ jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* si)
 	int shm_fd;
 	int rc = -1;
 	char name[SHM_NAME_MAX+1];
+	const char* promiscuous;
 
 	if (jack_shm_lock_registry () < 0) {
         jack_error ("jack_shm_lock_registry fails...");
@@ -876,6 +878,10 @@ jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* si)
 		close (shm_fd);
 		goto unlock;
 	}
+
+	promiscuous = getenv("JACK_PROMISCUOUS_SERVER");
+	if ((promiscuous != NULL) && (jack_promiscuous_perms(shm_fd, name, jack_group2gid(promiscuous)) < 0))
+		goto unlock;
 
 	close (shm_fd);
 	registry->size = size;

@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/python3
 # encoding: utf-8
 
 import re
@@ -74,12 +74,13 @@ def build(bld):
         includes.append('..')
     else:
         includes.append('../..')
-    uselib = ['PTHREAD', 'CELT', 'OPUS']
+    uselib = ['PTHREAD', 'CELT', 'OPUS', 'DB']
 
     if bld.env['IS_LINUX']:
         common_libsources += [
             'JackDebugClient.cpp',
             'timestamps.c',
+            'promiscuous.c',
             '../posix/JackPosixThread.cpp',
             '../posix/JackPosixProcessSync.cpp',
             '../posix/JackPosixMutex.cpp',
@@ -95,6 +96,7 @@ def build(bld):
         common_libsources += [
             'JackDebugClient.cpp',
             'timestamps.c',
+            'promiscuous.c',
            '../posix/JackPosixThread.cpp',
            '../posix/JackFifo.cpp',
            '../posix/JackPosixProcessSync.cpp',
@@ -109,6 +111,7 @@ def build(bld):
         common_libsources += [
             'JackDebugClient.cpp',
             'timestamps.c',
+            'promiscuous.c',
             '../posix/JackPosixProcessSync.cpp',
             '../posix/JackPosixThread.cpp',
             '../posix/JackPosixMutex.cpp',
@@ -153,6 +156,7 @@ def build(bld):
     clientlib.source += [
         'JackLibClient.cpp',
         'JackLibAPI.cpp',
+        'JackMetadata.cpp',
         ]
 
     if bld.env['IS_LINUX']:
@@ -246,6 +250,7 @@ def build(bld):
         'JackMidiSendQueue.cpp',
         'JackMidiUtil.cpp',
         'JackMidiWriteQueue.cpp',
+        'JackMetadata.cpp',
         ]
 
     if bld.env['IS_LINUX']:
@@ -383,12 +388,12 @@ def build(bld):
     if bld.env['BUILD_ADAPTER'] and bld.env['IS_LINUX'] and bld.env['BUILD_DRIVER_ALSA']:
          audio_adapter_sources += ['../linux/alsa/JackAlsaAdapter.cpp']
          process = create_jack_process_obj(bld, 'audioadapter', audio_adapter_sources, serverlib)
-         process.use = ['ALSA', 'SAMPLERATE']
+         process.use += ['ALSA', 'SAMPLERATE']
 
     if bld.env['BUILD_ADAPTER'] and bld.env['IS_SUN']:
          audio_adapter_sources += ['../solaris/oss/JackOSSAdapter.cpp', 'memops.c']
          process = create_jack_process_obj(bld, 'audioadapter', audio_adapter_sources, serverlib)
-         process.use = 'SAMPLERATE'
+         process.use += 'SAMPLERATE'
 
     if bld.env['BUILD_ADAPTER'] and bld.env['IS_WINDOWS']:
          audio_adapter_sources += ['../windows/portaudio/JackPortAudioAdapter.cpp', '../windows/portaudio/JackPortAudioDevices.cpp']

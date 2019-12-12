@@ -17,10 +17,26 @@
   Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 */
 
-#ifndef __jack_metadata_int_h__
-#define __jack_metadata_int_h__
+#ifndef __JackMetadata__
+#define __JackMetadata__
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+// libdb does not work in 32bit mixed mode
+#ifdef BUILD_WITH_32_64
+#undef HAVE_DB
+#define HAVE_DB 0
+#endif
 
 #include <stdint.h>
+
+#if HAVE_DB
+#include <db.h>
+#endif
+
+#include <jack/uuid.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,4 +69,56 @@ typedef void (*JackPropertyChangeCallback)(jack_uuid_t            subject,
 #ifdef __cplusplus
 }
 #endif
+
+
+namespace Jack
+{
+
+class JackClient;
+
+/*!
+\brief Metadata base.
+*/
+
+class JackMetadata
+{
+    private:
+
+    #if HAVE_DB
+        DB* fDB;
+        DB_ENV* fDBenv;
+        const bool fIsEngine;
+    #endif
+
+        int PropertyInit();
+        int PropertyChangeNotify(JackClient* client, jack_uuid_t subject, const char* key, jack_property_change_t change);
+
+    #if HAVE_DB
+        void MakeKeyDbt(DBT* dbt, jack_uuid_t subject, const char* key);
+    #endif
+
+    public:
+
+        JackMetadata(bool isEngine);
+        ~JackMetadata();
+
+        int GetProperty(jack_uuid_t subject, const char* key, char** value, char** type);
+        int GetProperties(jack_uuid_t subject, jack_description_t* desc);
+        int GetAllProperties(jack_description_t** descriptions);
+
+        int GetDescription(jack_uuid_t subject, jack_description_t* desc);
+        int GetAllDescriptions(jack_description_t** descs);
+        void FreeDescription(jack_description_t* desc, int free_actual_description_too);
+
+        int SetProperty(JackClient* client, jack_uuid_t subject, const char* key, const char* value, const char* type);
+
+        int RemoveProperty(JackClient* client, jack_uuid_t subject, const char* key);
+        int RemoveProperties(JackClient* client, jack_uuid_t subject);
+        int RemoveAllProperties(JackClient* client);
+
+};
+
+
+} // end of namespace
+
 #endif

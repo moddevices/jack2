@@ -61,10 +61,12 @@ static void signal_segv(int signum, siginfo_t* info, void*ptr)
 static void signal_segv(int signum, siginfo_t* info, void*ptr) {
     static const char *si_codes[3] = {"", "SEGV_MAPERR", "SEGV_ACCERR"};
 
-    size_t i;
     const char *si_code_str;
     ucontext_t *ucontext = (ucontext_t*)ptr;
 
+#if (defined(HAVE_UCONTEXT) && defined(HAVE_NGREG)) || defined(HAVE_EXECINFO_H)
+    size_t i;
+#endif
 #if defined(SIGSEGV_STACK_X86) || defined(SIGSEGV_STACK_IA64)
     int f = 0;
     Dl_info dlinfo;
@@ -94,7 +96,7 @@ static void signal_segv(int signum, siginfo_t* info, void*ptr) {
     }
     else
     {
-        jack_error("Unknown bad signal catched!");
+        jack_error("Unknown bad signal caught!");
     }
 
     if (info->si_code >= 0 && info->si_code < 3) 

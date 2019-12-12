@@ -71,13 +71,13 @@ namespace Jack
 //session params ******************************************************************************
 
     /**
-    \brief This structure containes master/slave connection parameters, it's used to setup the whole system
+    \brief This structure contains master/slave connection parameters, it's used to setup the whole system
 
     We have :
         - some info like version, type and packet id
         - names
         - network parameters (hostnames and mtu)
-        - nunber of audio and midi channels
+        - number of audio and midi channels
         - sample rate and buffersize
         - number of audio frames in one network packet (depends on the channel number)
         - is the NetDriver in Sync or ASync mode ?
@@ -342,8 +342,8 @@ namespace Jack
             int fPacketSize;
 
             void UpdateParams(int active_ports);
-        
-        
+
+
             void RenderFromNetwork(char* net_buffer, int active_port, int sub_cycle);
             void RenderToNetwork(char* net_buffer, int active_port, int sub_cycle);
 
@@ -379,7 +379,7 @@ namespace Jack
 
             int fCompressedSizeByte;
             unsigned char** fCompressedBuffer;
-   
+
             size_t fLastSubPeriodBytesSize;
 
             void FreeCelt();
@@ -422,7 +422,7 @@ namespace Jack
 
             int fCompressedMaxSizeByte;
             unsigned short* fCompressedSizesByte;
-   
+
             size_t fLastSubPeriodBytesSize;
 
             unsigned char** fCompressedBuffer;
@@ -456,7 +456,7 @@ namespace Jack
         private:
 
             int fCompressedSizeByte;
- 
+
             size_t fLastSubPeriodBytesSize;
 
             short** fIntBuffer;

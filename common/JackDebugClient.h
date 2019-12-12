@@ -68,7 +68,7 @@ class JackDebugClient : public JackClient
         JackDebugClient(JackClient* fTheClient);
         virtual ~JackDebugClient();
 
-        virtual int Open(const char* server_name, const char* name, int uuid, jack_options_t options, jack_status_t* status);
+        virtual int Open(const char* server_name, const char* name, jack_uuid_t uuid, jack_options_t options, jack_status_t* status);
         int Close();
 
         virtual JackGraphManager* GetGraphManager() const;
@@ -131,7 +131,7 @@ class JackDebugClient : public JackClient
         int InternalClientHandle(const char* client_name, jack_status_t* status);
         int InternalClientLoad(const char* client_name, jack_options_t options, jack_status_t* status, jack_varargs_t* va);
         void InternalClientUnload(int ref, jack_status_t* status);
-        
+
         // RT Thread
         int SetProcessThread(JackThreadCallback fun, void *arg);
 
