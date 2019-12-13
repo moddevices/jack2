@@ -544,7 +544,7 @@ void alloc_ports( int n_capture, int n_playback ) {
     capture_ports = NULL;
     for (chn = 0; chn < n_capture; chn++)
     {
-	snprintf (buf, sizeof(buf) - 1, "capture_%u", chn+1);
+	snprintf (buf, sizeof(buf) - 1, "USB_Audio_Capture_%u", chn+1);
 
 	port = jack_port_register (client, buf,
 		JACK_DEFAULT_AUDIO_TYPE,
@@ -560,12 +560,12 @@ void alloc_ports( int n_capture, int n_playback ) {
 	capture_ports = jack_slist_append (capture_ports, port);
     }
 
-    port_flags = JackPortIsInput;
+    port_flags = JackPortIsInput | JackPortIsPhysical | JackPortIsTerminal;
 
     playback_ports = NULL;
     for (chn = 0; chn < n_playback; chn++)
     {
-	snprintf (buf, sizeof(buf) - 1, "playback_%u", chn+1);
+	snprintf (buf, sizeof(buf) - 1, "USB_Audio_Playback_%u", chn+1);
 
 	port = jack_port_register (client, buf,
 		JACK_DEFAULT_AUDIO_TYPE,
