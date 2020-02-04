@@ -110,7 +110,7 @@ bool JackPosixProcessSync::TimedWait(long usec)
 
     int res;
     timespec now;
-    clock_gettime(CLOCK_REALTIME, &now);
+    clock_gettime(fClockType, &now);
 
     timespec delta = { usec / 1000000, (usec % 1000000) * 1000 };
     timespec end   = { now.tv_sec + delta.tv_sec, now.tv_nsec + delta.tv_nsec };
@@ -138,7 +138,7 @@ bool JackPosixProcessSync::LockedTimedWait(long usec)
     }
 
     timespec now;
-    clock_gettime(CLOCK_REALTIME, &now);
+    clock_gettime(fClockType, &now);
 
     timespec delta = { usec / 1000000, (usec % 1000000) * 1000 };
     timespec end   = { now.tv_sec + delta.tv_sec, now.tv_nsec + delta.tv_nsec };
