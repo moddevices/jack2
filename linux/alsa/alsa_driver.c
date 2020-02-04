@@ -984,10 +984,6 @@ alsa_driver_get_channel_addresses (alsa_driver_t *driver,
 	return 0;
 }
 
-#if defined(__ARM_ARCH_7A__)
-static jack_time_t time_at_start = 0;
-#endif
-
 int
 alsa_driver_start (alsa_driver_t *driver)
 {
@@ -1110,9 +1106,6 @@ alsa_driver_start (alsa_driver_t *driver)
 		}
 	}
 
-#if defined(__ARM_ARCH_7A__)
-	time_at_start = GetMicroSeconds();
-#endif
 	return 0;
 }
 
@@ -1179,15 +1172,6 @@ static int
 alsa_driver_restart (alsa_driver_t *driver)
 {
 	int res;
-
-#if defined(__ARM_ARCH_7A__)
-	jack_time_t now = GetMicroSeconds();
-	if (now >= time_at_start && now - time_at_start < 5000000) {
-		jack_error("JACK: Got xrun in the first 5 seconds, sleeping...");
-		sleep(1);
-		jack_error("JACK: Done, let's hope this works!");
-	}
-#endif
 
 	driver->xrun_recovery = 1;
     // JACK2
