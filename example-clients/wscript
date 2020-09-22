@@ -135,6 +135,34 @@ def build(bld):
         prog.use = ['clientlib', 'ALSA', 'SAMPLERATE', 'M']
         prog.target = 'alsa_out'
 
+        prog = bld(features = 'cxx cshlib')
+        prog.install_path = '${ADDON_DIR}/'
+        prog.includes = os_incdir + ['../common/jack', '../common', 'zalsa']
+        prog.source = ['zalsa/zita-a2j.cc', 'zalsa/alsathread.cc', 'zalsa/jackclient.cc', 'zalsa/pxthread.cc', 'zalsa/lfqueue.cc']
+        prog.target = 'zita-a2j'
+        prog.use = ['ALSA', 'M', 'RT', 'serverlib']
+        prog.env['cxxshlib_PATTERN'] = '%s.so'
+        prog.env.append_value('CXXFLAGS', '-DAPPNAME="zalsa_in"')
+        prog.env.append_value('CXXFLAGS', '-DVERSION="0.4.0"')
+        prog.env.append_value('CXXFLAGS', '-fPIC')
+        prog.env.append_value('LDFLAGS', '-lzita-alsa-pcmi')
+        prog.env.append_value('LDFLAGS', '-lzita-resampler')
+        prog.env.append_value('LDFLAGS', '-lasound')
+
+        prog = bld(features = 'cxx cshlib')
+        prog.install_path = '${ADDON_DIR}/'
+        prog.includes = os_incdir + ['../common/jack', '../common', 'zalsa']
+        prog.source = ['zalsa/zita-j2a.cc', 'zalsa/alsathread.cc', 'zalsa/jackclient.cc', 'zalsa/pxthread.cc', 'zalsa/lfqueue.cc']
+        prog.target = 'zita-j2a'
+        prog.use = ['ALSA', 'M', 'RT', 'serverlib']
+        prog.env['cxxshlib_PATTERN'] = '%s.so'
+        prog.env.append_value('CXXFLAGS', '-DAPPNAME="zalsa_out"')
+        prog.env.append_value('CXXFLAGS', '-DVERSION="0.4.0"')
+        prog.env.append_value('CXXFLAGS', '-fPIC')
+        prog.env.append_value('LDFLAGS', '-lzita-alsa-pcmi')
+        prog.env.append_value('LDFLAGS', '-lzita-resampler')
+        prog.env.append_value('LDFLAGS', '-lasound')
+
     for example_lib, example_lib_source in list(example_libs.items()):
         lib = bld(features = 'c cshlib')
         if not bld.env['IS_WINDOWS']:
