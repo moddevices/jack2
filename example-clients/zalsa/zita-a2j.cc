@@ -27,13 +27,13 @@
 #include "jackclient.h"
 #include "lfqueue.h"
 
-static const char *clopt = "hvLj:d:r:p:n:c:Q:I:";
+static const char *clopt = "hvLSj:d:r:p:n:c:Q:I:";
 
 static void help (void)
 {
     fprintf (stderr, "\n%s-%s\n", APPNAME, VERSION);
-    fprintf (stderr, "(C) 2012-2013 Fons Adriaensen  <fons@linuxaudio.org>\n");
-    fprintf (stderr, "Use ALSA capture device as a Jack client, with resampling.\n\n");
+    fprintf (stderr, "(C) 2012-2018 Fons Adriaensen  <fons@linuxaudio.org>\n");
+    fprintf (stderr, "Use ALSA capture device as a Jack client.\n\n");
     fprintf (stderr, "Usage: %s <options>\n", APPNAME);
     fprintf (stderr, "Options:\n");
     fprintf (stderr, "  -h                 Display this text\n");
@@ -43,11 +43,11 @@ static void help (void)
     fprintf (stderr, "  -p <period>        Period size [256]\n");   
     fprintf (stderr, "  -n <nfrags>        Number of fragments [2]\n");   
     fprintf (stderr, "  -c <nchannels>     Number of channels [2]\n");
-    fprintf (stderr, "  -Q <quality>       Resampling quality [48]\n");
-    fprintf (stderr, "  -I <latency>       Latency adjustment[0]\n");
+    fprintf (stderr, "  -S                 Word clock sync, no resampling\n");
+    fprintf (stderr, "  -Q <quality>       Resampling quality, 16..96 [auto]\n");
+    fprintf (stderr, "  -I <samples>       Latency adjustment [0]\n");
     fprintf (stderr, "  -L                 Force 16-bit and 2 channels [off]\n");
     fprintf (stderr, "  -v                 Print tracing information [off]\n");
-    exit (1);
 }
 
 class zita_a2j
@@ -59,6 +59,7 @@ class zita_a2j
 	bool stop;
 	bool v_opt;
 	bool L_opt;
+	bool S_opt;
 	char *jname;
 	char *device;
 	int fsamp;
@@ -79,13 +80,14 @@ public:
         stop = false;
         v_opt = false;
         L_opt = false;
+        S_opt = false;
         jname = strdup(APPNAME);
         device = 0;
-        fsamp = 0;
-        bsize = 0;
+        fsamp = 48000;
+        bsize = 128;
         nfrag = 2;
         nchan = 2;
-        rqual = 48;
+        rqual = 0;
         ltcor = 0;
         A = 0;
         C = 0;
@@ -106,13 +108,14 @@ private:
             {
                 fprintf (stderr, "  Missing argument for '-%c' option.\n", k); 
                 fprintf (stderr, "  Use '-h' to see all options.\n");
-                exit (1);
+                return 1;
             }
             switch (k)
             {
-            case 'h' : help (); exit (0);
+            case 'h' : help (); return 1;
             case 'v' : v_opt = true; break;
             case 'L' : L_opt = true; break;
+            case 'S' : S_opt = true; break;
             case 'j' : jname = optarg; break;
             case 'd' : device = optarg; break;
             case 'r' : fsamp = atoi (optarg); break;    
@@ -182,40 +185,41 @@ private:
 
     void printinfo (void)
     {
-        int     n;
+        int     n, k;
         double  e, r;
         Jdata   *J;
 
         n = 0;
+        k = 99999;
         e = r = 0;
         while (infoq->rd_avail ())
         {
-	    J = infoq->rd_datap ();
-	    if (J->_state == Jackclient::TERM)
-	    {
-	        printf ("Fatal error condition, terminating.\n");
-	        stop = true;
-	        return;
-	    }
-	    else if (J->_state == Jackclient::WAIT)
-	    {
-	        printf ("Detected excessive timing errors, waiting 15 seconds.\n");
-	        printf ("This may happen with current Jack1 after freewheeling.\n");
-	        n = 0;
-	    }
-	    else if (J->_state == Jackclient::SYNC0)
-	    {
+            J = infoq->rd_datap ();
+            if (J->_state == Jackclient::TERM)
+            {
+                printf ("Fatal error condition, terminating.\n");
+                stop = true;
+                return;
+            }
+            else if (J->_state == Jackclient::WAIT)
+            {
+                printf ("Detected excessive timing errors, waiting 10 seconds.\n");
+                n = 0;
+            }
+            else if (J->_state == Jackclient::SYNC0)
+            {
                 printf ("Starting synchronisation.\n");
-	    }
-	    else if (v_opt)
-	    {
-	        n++;
-	        e += J->_error;
-	        r += J->_ratio;
-	    }
-	    infoq->rd_commit ();
+            }
+            else if (v_opt)
+            {
+                n++;
+                e += J->_error;
+                r += J->_ratio;
+                if (J->_bstat < k) k = J->_bstat;
+            }
+            infoq->rd_commit ();
         }
-        if (n) printf ("%8.3lf %10.6lf\n", e / n, r / n);
+        if (n) printf ("%8.3lf %10.6lf %5d\n", e / n, r / n, k);
     }
 
 
@@ -238,30 +242,17 @@ public:
                 return 1;
         }
 
-        if (device == 0) help ();
+        if (device == 0)
+        {
+            help ();
+            return 1;
+        }
         if (rqual < 16) rqual = 16;
         if (rqual > 96) rqual = 96;
-        if ((fsamp && fsamp < 8000) || (bsize && bsize < 16) || (nfrag < 2) || (nchan < 1))
+        if ((fsamp < 8000) || (bsize < 16) || (nfrag < 2) || (nchan < 1))
         {
-	    fprintf (stderr, "Illegal parameter value(s).\n");
-	    return 1;
-        }
-
-        J = new Jackclient (client, 0, Jackclient::CAPT, 0, false, this);
-        usleep (100000);    
-
-        /* if SR and/or bufsize are unspecified, use the same values
-           as the JACK server.
-        */
-        
-        if (fsamp == 0) 
-        {
-           fsamp = J->fsamp();
-        }
-
-        if (bsize == 0) 
-        {
-           bsize = J->bsize();
+            fprintf (stderr, "Illegal parameter value(s).\n");
+            return 1;
         }
 
         opts = 0;
@@ -270,28 +261,39 @@ public:
         A = new Alsa_pcmi (0, device, 0, fsamp, bsize, nfrag, opts);
         if (A->state ())
         {
-	    fprintf (stderr, "Can't open ALSA capture device '%s'.\n", device);
-	    return 1;
+            fprintf (stderr, "Can't open ALSA capture device '%s'.\n", device);
+            return 1;
         }
         if (v_opt) A->printinfo ();
         if (nchan > A->ncapt ())
         {
             nchan = A->ncapt ();
-	    fprintf (stderr, "Warning: only %d channels are available.\n", nchan);
+            fprintf (stderr, "Warning: only %d channels are available.\n", nchan);
         }
         C = new Alsathread (A, Alsathread::CAPT);
+        J = new Jackclient (client, 0, Jackclient::CAPT, nchan, S_opt, this);
+        usleep (100000);
 
         t_alsa = (double) bsize / fsamp;
         if (t_alsa < 1e-3) t_alsa = 1e-3;
         t_jack = (double) J->bsize () / J->fsamp (); 
-        t_del = 1.5 * t_alsa + t_jack;
+        t_del = t_alsa + t_jack;
         k_del = (int)(t_del * fsamp);
-        for (k = 256; k < k_del + J->bsize (); k *= 2);
+        for (k = 256; k < 2 * k_del; k *= 2);
         audioq = new Lfq_audio (k, nchan);
+
+        if (rqual == 0)
+        {
+            k = (fsamp < J->fsamp ()) ? fsamp : J->fsamp ();
+            if (k < 44100) k = 44100;
+            rqual = (int)((6.7 * k) / (k - 38000));
+        }
+        if (rqual < 16) rqual = 16;
+        if (rqual > 96) rqual = 96;
 
         C->start (audioq, commq, alsaq, J->rprio () + 10);
         J->start (audioq, commq, alsaq, infoq, J->fsamp () / (double) fsamp, k_del, ltcor, rqual);
-        
+
         return 0;
     }
 
