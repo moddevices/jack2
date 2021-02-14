@@ -247,7 +247,7 @@ public:
 	    return 1;
         }
 
-        J = new Jackclient (client, 0, Jackclient::CAPT, 0, this);
+        J = new Jackclient (client, 0, Jackclient::CAPT, 0, false, this);
         usleep (100000);    
 
         /* if SR and/or bufsize are unspecified, use the same values
@@ -280,8 +280,6 @@ public:
 	    fprintf (stderr, "Warning: only %d channels are available.\n", nchan);
         }
         C = new Alsathread (A, Alsathread::CAPT);
-
-        J->register_ports (nchan);
 
         t_alsa = (double) bsize / fsamp;
         if (t_alsa < 1e-3) t_alsa = 1e-3;

@@ -1,6 +1,6 @@
 // ----------------------------------------------------------------------------
 //
-//  Copyright (C) 2012 Fons Adriaensen <fons@linuxaudio.org>
+//  Copyright (C) 2012-2018 Fons Adriaensen <fons@linuxaudio.org>
 //    
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -16,25 +16,26 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 // ----------------------------------------------------------------------------
-#include <iostream>
+
 
 #include <stdio.h>
 #include <math.h>
-#include <jack/jack.h>
-#include <jack/thread.h>
 #include "jackclient.h"
 #include "alsathread.h"
+#include "timers.h"
 
 
-Jackclient::Jackclient (jack_client_t* cl, const char*jserv, int mode, int nchan, void *arg) :
+Jackclient::Jackclient (jack_client_t* cl, const char *jserv, int mode, int nchan, bool sync, void *arg) :
     _client (cl),
     _arg (arg),
     _mode (mode),
     _nchan (nchan),     
     _state (INIT),
-    _freew (false)
+    _freew (false),
+    _resamp (0)
 {
     init (jserv);
+    if (!sync) _resamp = new VResampler ();
 }
 
 
@@ -44,15 +45,16 @@ Jackclient::~Jackclient (void)
 }
 
 
-void Jackclient::init (const char *jserv)
+bool Jackclient::init (const char *jserv)
 {
-    int                 spol;
-    jack_status_t       stat;
+    int                 i, spol, flags;
+    char                s [64];
     struct sched_param  spar;
 
     if (_client == 0)
     {
-        return;
+        fprintf (stderr, "Can't connect to Jack, is the server running ?\n");
+        return false;
     }
     jack_set_process_callback (_client, jack_static_process, (void *) this);
     jack_set_latency_callback (_client, jack_static_latency, (void *) this);
@@ -62,32 +64,17 @@ void Jackclient::init (const char *jserv)
 
     _bsize = 0;
     _fsamp = 0;
-
+    if (jack_activate (_client))
+    {
+        fprintf(stderr, "Can't activate Jack");
+        return false;
+    }
     _jname = jack_get_client_name (_client);
     _bsize = jack_get_buffer_size (_client);
     _fsamp = jack_get_sample_rate (_client);
 
-    if (_nchan) 
-    {
-       register_ports (_nchan);
-    }
-
-    _rprio = jack_client_real_time_priority (_client);
-}
-
-void Jackclient::register_ports (int n)
-{
-    int i, flags;
-    char s [64];
-
-    if (n > sizeof (_ports) / sizeof (_ports[0])) 
-    {
-        return;
-    }
-
     flags = JackPortIsTerminal | JackPortIsPhysical;
-
-    for (i = 0; i < n; i++)
+    for (i = 0; i < _nchan; i++)
     {
 	if (_mode == PLAY)
 	{
@@ -102,14 +89,17 @@ void Jackclient::register_ports (int n)
                                              flags | JackPortIsOutput, 0);
 	}
     }
-
-    _nchan = n;
+    pthread_getschedparam (jack_client_thread_id (_client), &spol, &spar);
+    _rprio = spar.sched_priority -  sched_get_priority_max (spol);
     _buff = new float [_bsize * _nchan];
+    return true;
 }
+
 
 void Jackclient::fini (void)
 {
     delete[] _buff;
+    delete _resamp;
 }
 
 
@@ -162,25 +152,20 @@ void Jackclient::start (Lfq_audio   *audioq,
     _commq = commq;
     _alsaq = alsaq;
     _infoq = infoq;
-    _quant = ldexp (1e-6f, 28);
     _ratio = ratio;
+    _delay = delay;
     _rcorr = 1.0;
-    _resamp.setup (_ratio, _nchan, rqual);
-    _resamp.set_rrfilt (100);
-    d = _resamp.inpsize () / 2.0;
-    if (_mode == PLAY) d *= _ratio;
-    _delay = delay + d;
+    if (_resamp)
+    {
+        _resamp->setup (_ratio, _nchan, rqual);
+        _resamp->set_rrfilt (100);
+        d = _resamp->inpsize () / 2.0;
+        if (_mode == PLAY) d *= _ratio;
+        _delay += d;
+    }
     _ltcor = ltcor;
     _ppsec = (_fsamp + _bsize / 2) / _bsize;
-
-    if (jack_activate (_client))
-    {
-        fprintf(stderr, "Can't activate Jack");
-        return;
-    }
-
     initwait (_ppsec / 2);
-
     jack_recompute_total_latencies (_client);
 }
 
@@ -200,15 +185,17 @@ void Jackclient::initsync (void)
     _commq->reset ();
     _alsaq->reset ();
     _audioq->reset ();
-    // Reset and prefill the resampler.
-    _resamp.reset ();
-    _resamp.inp_count = _resamp.inpsize () / 2 - 1;
-    _resamp.out_count = 10000;
-    _resamp.process ();
+    if (_resamp)
+    {
+        // Reset and prefill the resampler.
+	_resamp->reset ();
+	_resamp->inp_count = _resamp->inpsize () / 2 - 1;
+	_resamp->out_count = 99999;
+	_resamp->process ();
+    }
     // Initiliase state variables.
     _t_a0 = _t_a1 = 0;
     _k_a0 = _k_a1 = 0;
-    _k_j0 = 0;
     // Initialise loop filter state.
     _z1 = _z2 = _z3 = 0;
     // Activate the ALSA thread,
@@ -223,11 +210,12 @@ void Jackclient::setloop (double bw)
     double w;
 
     // Set the loop bandwidth to bw Hz.
-    w = 6.28f * 20 * bw * _bsize / _fsamp;
-    _w0 = 1.0 - exp (-w);
-    w = 6.28f * bw * _ratio / _fsamp;
-    _w1 = w * 1.6;
-    _w2 = w * _bsize / 1.6;
+    w = 6.28 * bw * _bsize / _fsamp;
+    _w0 = 1.0 - exp (-20.0 * w);
+    _w1 = w * 2 / _bsize;
+    _w2 = w / 2;
+    if (_mode == PLAY) _w1 /= _ratio;
+    else               _w1 *= _ratio;
 }
 
 
@@ -235,28 +223,55 @@ void Jackclient::playback (int nframes)
 {
     int    i, j, n;
     float  *p, *q;
+    float  *inp [MAXCHAN];
 
-    // Interleave inputs into _buff.
+    _bstat = _audioq->rd_avail ();
     for (i = 0; i < _nchan; i++)
     {
-	p = (float *)(jack_port_get_buffer (_ports [i], nframes));
-	q = _buff + i;
-	for (j = 0; j < _bsize; j++) q [j * _nchan] = p [j];
-    }       
-    // Resample _buff and write to audio queue.
-    // The while loop takes care of wraparound.
-    _resamp.inp_count = _bsize;
-    _resamp.inp_data  = _buff;
-    while (_resamp.inp_count)
+        inp [i] = (float *)(jack_port_get_buffer (_ports [i], nframes));
+    }
+    if (_resamp)
+    {    
+	// Interleave inputs into _buff.
+	for (i = 0; i < _nchan; i++)
+	{
+	    p = inp [i];
+	    q = _buff + i;
+	    for (j = 0; j < _bsize; j++) q [j * _nchan] = p [j];
+	}       
+	// Resample _buff and write to audio queue.
+	// The while loop takes care of wraparound.
+	_resamp->inp_count = _bsize;
+	_resamp->inp_data  = _buff;
+	while (_resamp->inp_count)
+	{
+	    _resamp->out_count = _audioq->wr_linav ();
+	    _resamp->out_data  = _audioq->wr_datap ();
+	    n = _resamp->out_count;
+	    _resamp->process ();
+	    n -= _resamp->out_count;
+	    _audioq->wr_commit (n);
+	}
+    }
+    else
     {
-	_resamp.out_count = _audioq->wr_linav ();
-	_resamp.out_data  = _audioq->wr_datap ();
-	n = _resamp.out_count;
-	_resamp.process ();
-	n -= _resamp.out_count;
-	_audioq->wr_commit (n);
-	// Adjust state by the number of frames used.
-	_k_j0 += n;
+        // Interleave inputs into audio queue.
+	// The while loop takes care of wraparound.
+	while (nframes)
+	{
+	    q = _audioq->wr_datap ();
+	    n = _audioq->wr_linav ();
+	    if (n > nframes) n = nframes;
+	    for (i = 0; i < _nchan; i++)
+	    {
+	        p = inp [i];
+	        for (j = 0; j < n; j++) q [j * _nchan] = p [j];
+		inp [i] += n;
+		q += 1;
+	    }
+	    _audioq->wr_commit (n);
+	    nframes -= n;
+	}
     }
 }
 
@@ -265,29 +280,56 @@ void Jackclient::capture (int nframes)
 {
     int    i, j, n;
     float  *p, *q;
+    float  *out [MAXCHAN];
 
-    // Read from audio queue and resample.
-    // The while loop takes care of wraparound.
-    _resamp.out_count = _bsize;
-    _resamp.out_data  = _buff;
-    while (_resamp.out_count)
-    {
-	_resamp.inp_count = _audioq->rd_linav ();
-	_resamp.inp_data  = _audioq->rd_datap ();
-	n = _resamp.inp_count;
-	_resamp.process ();
-	n -= _resamp.inp_count;
-	_audioq->rd_commit (n);
-	// Adjust state by the number of frames used.
-	_k_j0 += n;
-    }
-    // Deinterleave _buff to outputs.
     for (i = 0; i < _nchan; i++)
     {
-	p = _buff + i;
-	q = (float *)(jack_port_get_buffer (_ports [i], nframes));
-	for (j = 0; j < _bsize; j++) q [j] = p [j * _nchan];
-    }       
+        out [i] = (float *)(jack_port_get_buffer (_ports [i], nframes));
+    }
+    if (_resamp)
+    {
+	// Read from audio queue and resample.
+	// The while loop takes care of wraparound.
+	_resamp->out_count = _bsize;
+	_resamp->out_data  = _buff;
+	while (_resamp->out_count)
+	{
+	    _resamp->inp_count = _audioq->rd_linav ();
+	    _resamp->inp_data  = _audioq->rd_datap ();
+	    n = _resamp->inp_count;
+	    _resamp->process ();
+	    n -= _resamp->inp_count;
+	    _audioq->rd_commit (n);
+	}
+	// Deinterleave _buff to outputs.
+	for (i = 0; i < _nchan; i++)
+	{
+	    p = _buff + i;
+	    q = out [i];
+	    for (j = 0; j < _bsize; j++) q [j] = p [j * _nchan];
+	}
+    }
+    else
+    {
+        // Deinterleave audio queue to outputs.
+	// The while loop takes care of wraparound.
+	while (nframes)
+	{
+	    p = _audioq->rd_datap ();
+	    n = _audioq->rd_linav ();
+	    if (n > nframes) n = nframes;
+	    for (i = 0; i < _nchan; i++)
+	    {
+	        q = out [i];
+	        for (j = 0; j < n; j++) q [j] = p [j * _nchan];
+		out [i] += n;
+		p += 1;
+	    }
+	    _audioq->rd_commit (n);
+	    nframes -= n;
+	}
+    }
+    _bstat = _audioq->rd_avail ();
 }
 
 
@@ -315,6 +357,7 @@ void Jackclient::sendinfo (int state, double error, double ratio)
 	J->_state = state;
 	J->_error = error;
 	J->_ratio = ratio;
+	J->_bstat = _bstat;
 	_infoq->wr_commit ();
     }
 }
@@ -354,8 +397,10 @@ int Jackclient::jack_process (int nframes)
 {
     int             dk, n;
     Adata           *D;
+    jack_time_t     t0, t1;
     jack_nframes_t  ft;
-    double          tj, err, d1, d2;
+    float           us;
+    double          tj, err, d1, d2, rd;
 
     // Buffer size change or other evil.
     if (_state == TERM)
@@ -378,16 +423,27 @@ int Jackclient::jack_process (int nframes)
         else return 0;
     }
 
-    // Compute the start time of the current cycle.
-    // Jack should really provide the usecs directly.
-    ft = jack_last_frame_time (_client);
-    tj = 1e-6 * (jack_frames_to_time (_client, ft) & 0x0FFFFFFF);
+    // Get the start time of the current cycle.
+    jack_get_cycle_times (_client, &ft, &t0, &t1, &us);
+    tj = tjack (t0);
 
-    // Check for any skipped cycles. This is invalid
-    // the first time, but won't be used then anyway.
-    dk = ft - _ft - _bsize;
+    // Check for any skipped cycles.
+    if (_state >= SYNC1)
+    {
+        dk = ft - _ft - _bsize;
+        if (_mode == PLAY)
+	{
+	    dk = (int)(dk * _ratio + 0.5);
+            _audioq->wr_commit (dk);
+	}
+	else
+	{
+	    dk = (int)(dk / _ratio + 0.5);    
+            _audioq->rd_commit (dk);
+	}
+    }
     _ft = ft;
-
+    
     // Check if we have timing data from the ALSA thread.
     n = _alsaq->rd_avail ();
     // If the data queue is full restart synchronisation.
@@ -410,7 +466,7 @@ int Jackclient::jack_process (int nframes)
             D = _alsaq->rd_datap ();
             // Restart synchronisation in case of
             // an error in the ALSA interface.
-            if (D->_state == Alsathread::WAIT)
+   	    if (D->_state == Alsathread::WAIT)
             {
                 initwait (_ppsec / 2);
                 return 0;
@@ -425,78 +481,32 @@ int Jackclient::jack_process (int nframes)
     if (_state >= SYNC2)
     {
         // Compute the delay error.
-        d1 = modtime (tj - _t_a0);
-        d2 = modtime (_t_a1 - _t_a0);
+        d1 = tjack_diff (tj, _t_a0);
+        d2 = tjack_diff (_t_a1, _t_a0);
+	rd = _resamp ? _resamp->inpdist () : 0.0;
+
 	if (_mode == PLAY)
 	{
-            n = _k_j0 - _k_a0; // Must be done as integer as both terms will overflow.
-            err = n - (_k_a1 - _k_a0) * d1 / d2  + _resamp.inpdist () * _ratio - _delay;
+            n = _audioq->nwr () - _k_a0; // Must be done as integer as both terms will overflow.
+            err = n - (_k_a1 - _k_a0) * d1 / d2  + rd * _ratio - _delay;
 	}
 	else
 	{
-            n = _k_a0 - _k_j0;
-            err = n + (_k_a1 - _k_a0) * d1 / d2  + _resamp.inpdist () - _delay ;
+            n = _k_a0 - _audioq->nrd (); // Must be done as integer as both terms will overflow.
+            err = n + (_k_a1 - _k_a0) * d1 / d2  + rd - _delay ;
 	}
-
         n = (int)(floor (err + 0.5));
         if (_state == SYNC2)
         {
-            // We have the first delay error value. Adjust both the state
-            // variables and the audio queue by the same number of frames
-            // to obtain the actually wanted delay, and start tracking.
-	    if (_mode == PLAY)
-	    {
-                _audioq->wr_commit (-n);
-                _k_j0 -= n;
-	    }
-	    else
-	    {
-                _audioq->rd_commit (n);
-                _k_j0 += n;
-	    }
+            // We have the first delay error value. Adjust the audio
+	    // queue to obtain the actually wanted delay, and start
+	    // tracking.
+	    if (_mode == PLAY) _audioq->wr_commit (-n);
+	    else               _audioq->rd_commit (n);
             err -= n;
             setloop (1.0);
             _state = PROC1;
         }    
-        else if (_state >= PROC1)
-        {
-	    // Check error conditions.
-	    if (dk)
-	    {
-                // Jack skipped some cycles. Adjust both the state
-                // and the audio queue so we can just continue.
-		// The loop will correct the remaining fraction
-		// of a frame.
-	        if (_mode == PLAY)
-		{
-		    dk = (int)(dk * _ratio + 0.5);
-                    if (abs (dk + n) < _bsize / 4)
-                    {
-                        _audioq->wr_commit (dk);
-                        _k_j0 += dk;
-                        err += dk;
-		        n = 0;
-		    }
-		}
-		else
-		{
-		    dk = (int)(dk / _ratio + 0.5);    
-                    if (abs (dk - n) < _bsize / 4)
-		    {                
-                        _audioq->rd_commit (dk);
-                        _k_j0 += dk;
-                        err -= dk;
-		        n = 0;
-		    }
-		}
-            }
-            if (fabs (err) >= 50)
-            {
-                // Something is really wrong, wait 15 seconds then restart.
-                initwait (15 * _ppsec);
-		return 0;
-            }
-        }
     }
 
     // Switch to lower bandwidth after 4 seconds.
@@ -508,14 +518,24 @@ int Jackclient::jack_process (int nframes)
 
     if (_state >= PROC1)
     {
-        // Run loop filter and set resample ratio.
         _z1 += _w0 * (_w1 * err - _z1);
         _z2 += _w0 * (_z1 - _z2);
         _z3 += _w2 * _z2;
-        _rcorr = 1 - _z2 - _z3;
-	if (_rcorr > 1.05) _rcorr = 1.05;
-	if (_rcorr < 0.95) _rcorr = 0.95;
-        _resamp.set_rratio (_rcorr);
+        // Check error conditions.
+        if (fabs (_z3) > 0.05)
+        {
+            // Something is really wrong, wait 10 seconds then restart.
+            initwait (10 * _ppsec);
+            return 0;
+        }
+        // Run loop filter and set resample ratio.
+	if (_resamp)
+	{
+            _rcorr = 1 - (_z2 + _z3);
+	    if (_rcorr > 1.05) _rcorr = 1.05;
+	    if (_rcorr < 0.95) _rcorr = 0.95;
+            _resamp->set_rratio (_rcorr);
+	}
 	sendinfo (_state, err, _rcorr);
 
 	// Resample and transfer between audio

@@ -1,6 +1,6 @@
 // ----------------------------------------------------------------------------
 //
-//  Copyright (C) 2012 Fons Adriaensen <fons@linuxaudio.org>
+//  Copyright (C) 2012-2018 Fons Adriaensen <fons@linuxaudio.org>
 //    
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -31,10 +31,10 @@ class Jackclient
 {
 public:
 
-    Jackclient (jack_client_t*, const char *jserv, int mode, int nchan, void *arg);
+    Jackclient (jack_client_t*, const char *jserv, int mode, int nchan, bool sync, void *arg);
     virtual ~Jackclient (void);
     
-    enum { PLAY, CAPT };
+    enum { PLAY, CAPT, MAXCHAN = 64 };
     enum { INIT, TERM, WAIT, SYNC0, SYNC1, SYNC2, PROC1, PROC2 };
 
     void start (Lfq_audio   *audioq,
@@ -50,21 +50,12 @@ public:
     int fsamp (void) const { return _fsamp; }
     int bsize (void) const { return _bsize; }
     int rprio (void) const { return _rprio; }
-    void register_ports (int nports);
     void *getarg(void) const { return _arg; }
 
 private:
 
-    void init (const char *jserv);
+    bool init (const char *jserv);
     void fini (void);
-
-    double modtime (double d)
-    {
-	if (d < -200) d += _quant;
-	if (d >  200) d -= _quant;
-	return d;
-    }
-
     void initwait (int nwait);
     void initsync (void);
     void setloop (double bw);
@@ -80,7 +71,7 @@ private:
     int  jack_process (int nframes);
 
     jack_client_t  *_client;
-    jack_port_t    *_ports [256];
+    jack_port_t    *_ports [MAXCHAN];
     void           *_arg;
     const char     *_jname;
     int             _mode;
@@ -98,15 +89,14 @@ private:
     Lfq_adata      *_alsaq;
     Lfq_jdata      *_infoq;
     double          _ratio;
-    double          _quant;
     int             _ppsec;
+    int             _bstat;
 
     jack_nframes_t  _ft;
     double          _t_a0;
     double          _t_a1;
     int             _k_a0;
     int             _k_a1;
-    int             _k_j0;
     double          _delay;
     int             _ltcor;
 
@@ -117,7 +107,7 @@ private:
     double           _z2;
     double           _z3;
     double          _rcorr;
-    VResampler      _resamp;
+    VResampler     *_resamp;
 
     static void jack_static_shutdown (void *arg);
     static int  jack_static_buffsize (jack_nframes_t nframes, void *arg);
