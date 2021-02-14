@@ -71,6 +71,7 @@ public:
     int32_t  _state;
     double   _error;
     double   _ratio;
+    int      _bstat;
 };
 
 
