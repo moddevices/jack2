@@ -1,6 +1,6 @@
 // ----------------------------------------------------------------------------
 //
-//  Copyright (C) 2012 Fons Adriaensen <fons@linuxaudio.org>
+//  Copyright (C) 2012-2018 Fons Adriaensen <fons@linuxaudio.org>
 //    
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -22,8 +22,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-#include <jack/jack.h>
 #include "alsathread.h"
+#include "timers.h"
 
 
 Alsathread::Alsathread (Alsa_pcmi *alsadev, int mode) :
@@ -40,8 +40,6 @@ Alsathread::Alsathread (Alsa_pcmi *alsadev, int mode) :
     _w1 = 2 * M_PI * 0.1 * _dt;
     _w2 = _w1 * _w1;
     _w1 *= 1.6;
-    // Time wraps around after 2^28 usecs.
-    _tq = ldexp (1e-6, 28);
 }
 
 
@@ -160,15 +158,17 @@ void Alsathread::thr_main (void)
     {
         // Wait for next cycle, then take timestamp.
 	na = _alsadev->pcm_wait ();  
-        tw = 1e-6 * (int)(jack_get_time () & 0x0FFFFFFF);
+
+	tw = tjack (jack_get_time ());
 	// Check for errors - requires restart.
 	if (_alsadev->state () && (na == 0))
 	{
-            _state = WAIT;
+	    _state = WAIT;
 	    send (0, 0);
+	    usleep (10000);
 	    continue;
 	}
-
+	
         // Check for commands from the Jack thread.
         if (_commq->rd_avail ())
 	{
@@ -193,27 +193,19 @@ void Alsathread::thr_main (void)
 	        {
 		    // Init DLL in first iteration.
 		    _first = false;
+                    _dt = (double) _fsize / _alsadev->fsamp ();
                     _t0 = tw;
 	            _t1 = tw + _dt;
-		    // Required for initial delay calculation.
-		    if (_mode == PLAY) nu -= _fsize;
-		    else               nu += _fsize;
 	        } 
 	        else 
 	        {
 		    // Update the DLL.
-                    er = tw - _t1;
-		    // Check for time wraparound.
-	            if (er < -200)
-	            {
-	                _t1 -= _tq;
-	                er = tw - _t1;
-		    }
 		    // If we have more than one period, use
                     // the time error only for the last one.
 	            if (na >= _fsize) er = 0;
+                    else er = tjack_diff (tw, _t1);
 	            _t0 = _t1;
-	            _t1 += _w1 * er + _dt;
+	            _t1 = tjack_diff (_t1 + _dt + _w1 * er, 0.0);
 	            _dt += _w2 * er;
 		}
 	    }

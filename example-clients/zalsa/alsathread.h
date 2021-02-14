@@ -1,6 +1,6 @@
 // ----------------------------------------------------------------------------
 //
-//  Copyright (C) 2012 Fons Adriaensen <fons@linuxaudio.org>
+//  Copyright (C) 2012-2018 Fons Adriaensen <fons@linuxaudio.org>
 //    
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 
 
 #include <zita-alsa-pcmi.h>
+#include "jack/jack.h"
 #include "pxthread.h"
 #include "lfqueue.h"
 
@@ -45,16 +46,17 @@ private:
     void send (int k, double t);
     int capture (void);
     int playback (void);
-
+    
     Alsa_pcmi    *_alsadev;
     int           _mode;
     int           _state;
+    int           _nfail;
     int           _fsize;
     Lfq_audio    *_audioq;
     Lfq_int32    *_commq;
     Lfq_adata    *_alsaq;
     bool          _first;
-    double        _tq;
+//    double        _jtmod;
     double        _t0;
     double        _t1;
     double        _dt;
